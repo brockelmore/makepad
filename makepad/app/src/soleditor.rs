@@ -668,18 +668,22 @@ impl SOLTokenizer {
             },
             'u' => { // use
                 if state.keyword(chunk, "int") {
-                    let mut subchunk = Vec::new();
-                    while(state.next_is_digit()) {
-                        chunk.push(state.next);
-                        subchunk.push(state.next);
-                        state.advance();
-                    }
-                    let chunk_str: String = subchunk.iter().collect();
-                    for i in 1..33_u16 {
-                        let d = (8*i).to_string();
-                        if chunk_str == d {
-                            return TokenType::TypeName
+                    if state.next_is_digit() {
+                        let mut subchunk = Vec::new();
+                        while(state.next_is_digit()) {
+                            chunk.push(state.next);
+                            subchunk.push(state.next);
+                            state.advance();
                         }
+                        let chunk_str: String = subchunk.iter().collect();
+                        for i in 1..33_u16 {
+                            let d = (8*i).to_string();
+                            if chunk_str == d {
+                                return TokenType::TypeName
+                            }
+                        }
+                    } else {
+                        return TokenType::TypeName
                     }
                 }
                 if state.keyword(chunk, "sing") {

@@ -1,0 +1,22 @@
+(
+    build_on_save:true,
+    exec_when_done:false,
+    live_macros_on_self:true,
+    style_options:(
+        scale:1.21,
+        dark:false,
+    ),
+    hub_server:Offline,
+    builders:{
+        "main":(
+            http_server:Localhost(8000),
+            workspaces:{
+                "yamV3":"/home/brock/rust-cevm",
+            },
+        ),
+    },
+    builds:[
+    ],
+    sync:{
+    },
+)
