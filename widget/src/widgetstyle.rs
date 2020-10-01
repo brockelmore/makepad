@@ -92,7 +92,7 @@ pub fn set_widget_style(cx: &mut Cx, opt: &StyleOptions) {
         Theme::color_text_deselected_defocus().set(cx, pick!(130, 130, 130).get(cx));
 
         TextEditor::color_bg().set(cx, pick!(0, 0, 0).get(cx));
-        TextEditor::color_gutter_bg().set(cx, pick!(30, 30, 30).get(cx));
+        TextEditor::color_gutter_bg().set(cx, pick!(5, 5, 5).get(cx));
         TextEditor::color_indent_line_unknown().set(cx, pick!(#5).get(cx));
         TextEditor::color_indent_line_fn().set(cx, pick!(220, 220, 174).get(cx));
         TextEditor::color_indent_line_typedef().set(cx, pick!(91, 155, 211).get(cx));
@@ -129,7 +129,7 @@ pub fn set_widget_style(cx: &mut Cx, opt: &StyleOptions) {
         TextEditor::color_string().set(cx, pick!(204, 145, 123).get(cx));
         TextEditor::color_number().set(cx, pick!(182, 206, 170).get(cx));
 
-        TextEditor::color_comment().set(cx, pick!(99, 141, 84).get(cx));
+        TextEditor::color_comment().set(cx, pick!(60, 60, 60).get(cx));
         TextEditor::color_doc_comment().set(cx, pick!(120, 171, 104).get(cx));
         TextEditor::color_paren_d1().set(cx, pick!(212, 212, 212).get(cx));
         TextEditor::color_paren_d2().set(cx, pick!(212, 212, 212).get(cx));
