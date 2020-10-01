@@ -51,7 +51,7 @@ fn shader() -> ShaderGen {ShaderView::base_shader().compose(shader!{"
                 c += pick!(#9135B0);
             }
             if t.y == 2.0 {
-                c += pick!(#FF0000);
+                c += pick!(#000000);
             }
             if t.y == 3.0 {
                 c += pick!(#0300DC);

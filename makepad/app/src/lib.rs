@@ -1,4 +1,4 @@
-pub mod keyboard; 
+pub mod keyboard;
 pub mod fileeditor;
 pub mod filepanel;
 pub mod homepage;
@@ -16,6 +16,7 @@ pub mod searchresults;
 pub mod codeicon;
 pub mod rusteditor;
 pub mod jseditor;
+pub mod soleditor;
 pub mod plaineditor;
 pub mod itemdisplay;
 pub mod livemacro;

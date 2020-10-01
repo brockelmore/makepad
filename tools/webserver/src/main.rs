@@ -15,19 +15,19 @@ fn main() {
     // config params
     let base_path = "";
     let calc_path = "./";
-    let exts = [".rs", ".js", ".toml", ".html", ".js", ".wasm", ".ttf", ".ron"];
+    let exts = [".rs", ".js", ".toml", ".html", ".js", ".wasm", ".ttf", ".ron", ".sol"];
     let ex_file = ["bindings.rs"];
     let ex_dirs = ["deps", "build", "edit_repo"];
-     
+
     let brotli_filecache = Arc::new(Mutex::new(None));
     let zlib_filecache = Arc::new(Mutex::new(None));
-    
+
     let http_server = HttpServer::start_http_server(
         SocketAddr::from(([0, 0, 0, 0], 80)),
         brotli_filecache.clone(),
         zlib_filecache.clone(),
     ).expect("Can't start server");
-    
+
     // the file reload loop
     std::thread::spawn(move || {
         let stdin = std::io::stdin();
@@ -45,7 +45,7 @@ fn main() {
             if let Ok(mut fc) = brotli_filecache.lock() {
                 *fc = None;
             }
-            
+
             let mut new_brotli_filecache = HashMap::new();
             println!("Starting brotli compression");
             let mut total_size = 0;
@@ -58,7 +58,7 @@ fn main() {
             iter.next();
         }
     });
-    
+
     http_server.listen_thread.unwrap().join().expect("can't join thread");
 }
 
@@ -68,7 +68,7 @@ pub struct HttpServer {
 }
 
 impl HttpServer {
-    
+
     fn handle_post(tcp_stream: &mut TcpStream, url: &str, mut body: Vec<u8>) {
         match url {
             "/subscribe" => {
@@ -78,7 +78,7 @@ impl HttpServer {
                     .append(true)
                     .open("subscribe.db")
                     .unwrap();
-                
+
                 body.push('\n' as u8);
                 if let Err(_) = file.write(&body) {
                     println!("Couldn't append email to file");
@@ -87,7 +87,7 @@ impl HttpServer {
             _ => return error_out(tcp_stream, 500)
         }
     }
-    
+
     fn handle_get(
         tcp_stream: &mut TcpStream,
         url: &str,
@@ -95,19 +95,19 @@ impl HttpServer {
         zlib_filecache: Option<Arc<HashMap<String, Vec<u8 >> >>,
         brotli_filecache: Option<Arc<HashMap<String, Vec<u8 >> >>
     ) {
-        
+
         let url = if let Some(url) = parse_url_file(url) {
             url
         }
         else {
             return error_out(tcp_stream, 500);
         };
-        
+
         let mime_type = if url.ends_with(".html") {"text/html"}
         else if url.ends_with(".wasm") {"application/wasm"}
         else if url.ends_with(".js") {"text/javascript"}
         else {"application/octet-stream"};
-        
+
         if accept_encoding.contains("br") { // we want the brotli
             if let Some(brotli_filecache) = brotli_filecache {
                 if let Some(data) = brotli_filecache.get(&url) {
@@ -129,7 +129,7 @@ impl HttpServer {
                 }
             }
         }
-        
+
         if accept_encoding.contains("gzip") || accept_encoding.contains("deflate"){
             if let Some(zlib_filecache) = zlib_filecache {
                 if let Some(data) = zlib_filecache.get(&url) {
@@ -139,7 +139,7 @@ impl HttpServer {
                             Cache-Control: max-age:0\r\n\
                             Content-Length: {}\r\n\
                             Connection: close\r\n\r\n",
-                        mime_type, 
+                        mime_type,
                         data.len()
                     );
                     write_bytes_to_tcp_stream_no_error(tcp_stream, header.as_bytes());
@@ -154,7 +154,7 @@ impl HttpServer {
         }
         return error_out(tcp_stream, 500);
     }
-    
+
     fn compress_tree_recursive(
         base_path: &str,
         calc_path: &str,
@@ -169,15 +169,15 @@ impl HttpServer {
             for entry in read_dir {
                 if entry.is_err() {continue};
                 let entry = entry.unwrap();
-                
+
                 let ty = entry.file_type();
                 if ty.is_err() {continue};
                 let ty = ty.unwrap();
-                
+
                 let name = entry.file_name().into_string();
                 if name.is_err() {continue};
                 let name = name.unwrap();
-                
+
                 if ty.is_dir() {
                     if dir_ex.iter().find( | dir | **dir == name).is_some() {
                         continue
@@ -204,7 +204,7 @@ impl HttpServer {
                             encoder.write_all(&data).expect("Write error!");
                             result = encoder.finish().expect("Failed to finish compression!");
                         }
-                        
+
                         *total_size += result.len();
                         //println!("Compressed {} {}->{}", key_path, data.len(), result.len());
                         filecache.insert(key_path, result);
@@ -213,16 +213,16 @@ impl HttpServer {
             }
         }
     }
-    
-    
+
+
     pub fn start_http_server(
         listen_address: SocketAddr,
         brotli_filecache: Arc<Mutex<Option<Arc<HashMap<String, Vec<u8 >> >> >>,
         zlib_filecache: Arc<Mutex<Option<Arc<HashMap<String, Vec<u8 >> >> >>
     ) -> Option<HttpServer> {
-        
+
         let listener = if let Ok(listener) = TcpListener::bind(listen_address.clone()) {listener} else {println!("Cannot bind http server port"); return None};
-        
+
         let listen_thread = {
             std::thread::spawn(move || {
                 for tcp_stream in listener.incoming() {
@@ -245,7 +245,7 @@ impl HttpServer {
                     else {
                         None
                     };
-                    
+
                     let brotli_filecache = if let Ok(v) = brotli_filecache.lock() {
                         if let Some(v) = v.as_ref() {
                             Some(v.clone())
@@ -257,16 +257,16 @@ impl HttpServer {
                     else {
                         None
                     };
-                    
+
                     let _read_thread = std::thread::spawn(move || {
-                        
+
                         let mut reader = BufReader::new(tcp_stream.try_clone().expect("Cannot clone tcp stream"));
-                        
+
                         // read the entire header
                         let mut header = Vec::new();
                         let mut content_length = None;
                         let mut accept_encoding = None;
-                        
+
                         let mut line = String::new();
                         while let Ok(_) = reader.read_line(&mut line) { // TODO replace this with a non-line read
                             if line == "\r\n" { // the newline
@@ -286,11 +286,11 @@ impl HttpServer {
                             header.push(line.clone());
                             line.truncate(0);
                         }
-                        
+
                         if header.len() < 2 {
                             return error_out(&mut tcp_stream, 500);
                         }
-                        
+
                         if let Some(url) = split_header_line(&header[0], "POST ") {
                             // we have to have a content-length or bust
                             if content_length.is_none() {
@@ -324,7 +324,7 @@ impl HttpServer {
                                 return Self::handle_get(&mut tcp_stream, url, accept_encoding, zlib_filecache, brotli_filecache)
                             }
                         }
-                        
+
                         return error_out(&mut tcp_stream, 500);
                     });
                 }
@@ -366,7 +366,7 @@ fn split_header_line<'a>(inp: &'a str, what: &str) -> Option<&'a str> {
 }
 
 fn parse_url_file(url: &str) -> Option<String> {
-    
+
     // find the end_of_name skipping everything else
     let end_of_name = url.find(' ');
     if end_of_name.is_none() {
@@ -376,13 +376,13 @@ fn parse_url_file(url: &str) -> Option<String> {
     let end_of_name = if let Some(q) = url.find('?') {
         end_of_name.min(q)
     }else {end_of_name};
-    
+
     let mut url = url[0..end_of_name].to_string();
-    
+
     if url.ends_with("/") {
         url.push_str("index.html");
     }
-    
+
     Some(url)
 }
 
