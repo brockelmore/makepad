@@ -1,4 +1,5 @@
 use crate::cx::*; 
+use makepad_live_compiler::ty::Ty;
 
 #[derive(Clone, Default, Debug, PartialEq, Copy)]
 pub struct InstanceArea{
@@ -228,14 +229,17 @@ impl Area{
          }
     }
 
-    pub fn get_instance_offset(&self, cx:&Cx, prop_id:PropId)->Option<usize>{
+    pub fn get_instance_offset(&self, cx:&Cx, live_id:LiveId, ty:Ty)->Option<usize>{
         match self{
             Area::Instance(inst)=>{
                 let cxview = &cx.views[inst.view_id];
                 let draw_call = &cxview.draw_calls[inst.draw_call_id];
                 let sh = &cx.shaders[draw_call.shader_id];
                 for prop in &sh.mapping.instance_props.props{
-                    if prop.prop_id == prop_id{
+                    if prop.live_id == live_id{
+                        if prop.ty != ty{
+                            panic!("Type wrong of live_id fetch in shader:{}, passed as arg: {}", prop.ty, ty);
+                        }
                         return Some(prop.offset)
                     }
                 }
@@ -245,14 +249,17 @@ impl Area{
         None
     }
 
-    pub fn get_uniform_offset(&self, cx:&Cx, prop_id:PropId)->Option<usize>{
+    pub fn get_user_uniform_offset(&self, cx:&Cx, live_id:LiveId, ty:Ty)->Option<usize>{
         match self{
             Area::Instance(inst)=>{
                 let cxview = &cx.views[inst.view_id];
                 let draw_call = &cxview.draw_calls[inst.draw_call_id];
                 let sh = &cx.shaders[draw_call.shader_id];
-                for prop in &sh.mapping.uniform_props.props{
-                    if prop.prop_id == prop_id{
+                for prop in &sh.mapping.user_uniform_props.props{
+                    if prop.ty != ty{
+                        return None
+                    }
+                    if prop.live_id == live_id{
                         return Some(prop.offset)
                     }
                 }
@@ -320,7 +327,7 @@ impl Area{
         return None;
     }
 
-    pub fn get_uniform_write_ref<'a>(&self, cx:&'a mut Cx)->Option<&'a mut Vec<f32>>{
+    pub fn get_user_uniforms_write_ref<'a>(&self, cx:&'a mut Cx)->Option<&'a mut Vec<f32>>{
         match self{
             Area::Instance(inst)=>{
                 let cxview = &mut cx.views[inst.view_id];
@@ -331,7 +338,7 @@ impl Area{
                 cx.passes[cxview.pass_id].paint_dirty = true;
                 draw_call.uniforms_dirty = true;
                 return Some(
-                    &mut draw_call.uniforms
+                    &mut draw_call.user_uniforms
                 )
             }
             _=>(),
@@ -339,8 +346,8 @@ impl Area{
         return None;
     }
 
-    pub fn write_float(&self, cx:&mut Cx, prop_ident:FloatId, value:f32){
-        if let Some(inst_offset) = self.get_instance_offset(cx, PropId::Float(prop_ident)){
+    pub fn write_float(&self, cx:&mut Cx, live_id:LiveId, value:f32){
+        if let Some(inst_offset) = self.get_instance_offset(cx, live_id, Ty::Float){
             let write = self.get_write_ref(cx);
             if let Some(write) = write{
                 for i in 0..write.count{
@@ -350,8 +357,8 @@ impl Area{
         }
     }
 
-    pub fn read_float(&self, cx:&Cx, prop_ident:FloatId)->f32{
-        if let Some(inst_offset) = self.get_instance_offset(cx, PropId::Float(prop_ident)){
+    pub fn read_float(&self, cx:&Cx, live_id:LiveId)->f32{
+        if let Some(inst_offset) = self.get_instance_offset(cx, live_id, Ty::Float){
             let read = self.get_read_ref(cx);
             if let Some(read) = read{
                 return read.buffer[read.offset + inst_offset]
@@ -360,8 +367,8 @@ impl Area{
         0.0
     }
 
-   pub fn write_vec2(&self, cx:&mut Cx, prop_ident:Vec2Id, value:Vec2){
-        if let Some(inst_offset) = self.get_instance_offset(cx, PropId::Vec2(prop_ident)){
+   pub fn write_vec2(&self, cx:&mut Cx, live_id:LiveId, value:Vec2){
+        if let Some(inst_offset) = self.get_instance_offset(cx, live_id, Ty::Vec2){
             let write = self.get_write_ref(cx);
             if let Some(write) = write{
                 for i in 0..write.count{
@@ -372,8 +379,8 @@ impl Area{
         }
    }
 
-    pub fn read_vec2(&self, cx:&Cx, prop_ident:Vec2Id)->Vec2{
-        if let Some(inst_offset) = self.get_instance_offset(cx, PropId::Vec2(prop_ident)){
+    pub fn read_vec2(&self, cx:&Cx, live_id:LiveId)->Vec2{
+        if let Some(inst_offset) = self.get_instance_offset(cx, live_id, Ty::Vec2){
             let read = self.get_read_ref(cx);
             if let Some(read) = read{
                 return Vec2{
@@ -385,8 +392,8 @@ impl Area{
         Vec2::default()
     }
 
-   pub fn write_vec3(&self, cx:&mut Cx, prop_ident:Vec3Id, value:Vec3){
-        if let Some(inst_offset) = self.get_instance_offset(cx, PropId::Vec3(prop_ident)){
+   pub fn write_vec3(&self, cx:&mut Cx, live_id:LiveId, value:Vec3){
+        if let Some(inst_offset) = self.get_instance_offset(cx, live_id, Ty::Vec3){
             let write = self.get_write_ref(cx);
             if let Some(write) = write{
                 for i in 0..write.count{
@@ -398,8 +405,8 @@ impl Area{
         }
     }
 
-    pub fn read_vec3(&self, cx:&Cx, prop_ident:Vec3Id)->Vec3{
-        if let Some(inst_offset) = self.get_instance_offset(cx, PropId::Vec3(prop_ident)){
+    pub fn read_vec3(&self, cx:&Cx, live_id:LiveId)->Vec3{
+        if let Some(inst_offset) = self.get_instance_offset(cx, live_id, Ty::Vec3){
             let read = self.get_read_ref(cx);
             if let Some(read) = read{
                 return Vec3{
@@ -412,8 +419,8 @@ impl Area{
         Vec3::default()
     }
 
-   pub fn write_vec4(&self, cx:&mut Cx, prop_ident:Vec4Id, value:Vec4){
-        if let Some(inst_offset) = self.get_instance_offset(cx, PropId::Vec4(prop_ident)){
+   pub fn write_vec4(&self, cx:&mut Cx, live_id:LiveId, value:Vec4){
+        if let Some(inst_offset) = self.get_instance_offset(cx, live_id, Ty::Vec4){
             let write = self.get_write_ref(cx);
             if let Some(write) = write{
                 for i in 0..write.count{
@@ -426,8 +433,8 @@ impl Area{
         }
    }
 
-    pub fn read_vec4(&self, cx:&Cx, prop_ident:Vec4Id)->Vec4{
-        if let Some(inst_offset) = self.get_instance_offset(cx, PropId::Vec4(prop_ident)){
+    pub fn read_vec4(&self, cx:&Cx, live_id:LiveId)->Vec4{
+        if let Some(inst_offset) = self.get_instance_offset(cx, live_id, Ty::Vec4){
             let read = self.get_read_ref(cx);
             if let Some(read) = read{
                 return Vec4{
@@ -441,8 +448,8 @@ impl Area{
         Vec4::default()
     }
 
-    pub fn write_color(&self, cx:&mut Cx, prop_ident:ColorId, value:Color){
-        if let Some(inst_offset) = self.get_instance_offset(cx, PropId::Color(prop_ident)){
+    pub fn write_color(&self, cx:&mut Cx, live_id:LiveId, value:Color){
+        if let Some(inst_offset) = self.get_instance_offset(cx, live_id, Ty::Vec4){
             let write = self.get_write_ref(cx);
             if let Some(write) = write{
                 for i in 0..write.count{
@@ -455,8 +462,8 @@ impl Area{
         }
    }
 
-    pub fn read_color(&self, cx:&Cx, prop_ident:ColorId)->Color{
-        if let Some(inst_offset) = self.get_instance_offset(cx, PropId::Color(prop_ident)){
+    pub fn read_color(&self, cx:&Cx, live_id:LiveId)->Color{
+        if let Some(inst_offset) = self.get_instance_offset(cx, live_id, Ty::Vec4){
             let read = self.get_read_ref(cx);
             if let Some(read) = read{
                 return Color{
@@ -470,8 +477,8 @@ impl Area{
         Color::default()
     }
     
-    pub fn write_mat4(&self, cx:&mut Cx, prop_ident:Mat4Id, value:&Mat4){
-        if let Some(inst_offset) = self.get_instance_offset(cx, PropId::Mat4(prop_ident)){
+    pub fn write_mat4(&self, cx:&mut Cx, live_id:LiveId, value:&Mat4){
+        if let Some(inst_offset) = self.get_instance_offset(cx, live_id, Ty::Mat4){
             let write = self.get_write_ref(cx);
             if let Some(write) = write{
                 for i in 0..write.count{
@@ -483,8 +490,8 @@ impl Area{
         }
    }
 
-    pub fn read_mat4(&self, cx:&Cx, prop_ident:ColorId)->Mat4{
-        if let Some(inst_offset) = self.get_instance_offset(cx, PropId::Color(prop_ident)){
+    pub fn read_mat4(&self, cx:&Cx, live_id:LiveId)->Mat4{
+        if let Some(inst_offset) = self.get_instance_offset(cx, live_id, Ty::Mat4){
             let read = self.get_read_ref(cx);
             if let Some(read) = read{
                 let mut ret = Mat4::default();
@@ -497,9 +504,9 @@ impl Area{
         Mat4::default()
     }
 
-    pub fn write_uniform_float(&self, cx:&mut Cx, prop_ident:FloatId, v:f32){
-        if let Some(uni_offset) = self.get_uniform_offset(cx, PropId::Float(prop_ident)){
-            let write = self.get_uniform_write_ref(cx);
+    pub fn write_uniform_float(&self, cx:&mut Cx, live_id:LiveId, v:f32){
+        if let Some(uni_offset) = self.get_user_uniform_offset(cx, live_id, Ty::Float){
+            let write = self.get_user_uniforms_write_ref(cx);
             if let Some(write) = write{
                 while uni_offset >= write.len(){
                     write.push(0.);
@@ -573,7 +580,7 @@ impl InstanceArea{
         draw_call.instance.extend_from_slice(data);
     }
 
-    pub fn push_last_float(&self, cx:&mut Cx, animator:&Animator, ident:FloatId)->f32{
+    pub fn push_last_float(&self, cx:&mut Cx, animator:&Animator, ident:LiveId)->f32{
         let ret = animator.last_float(cx, ident);
         self.push_float(cx, ret);
         ret
@@ -586,7 +593,7 @@ impl InstanceArea{
         draw_call.instance.push(value);
     }
 
-    pub fn push_last_vec2(&self, cx:&mut Cx, animator:&Animator, ident:Vec2Id)->Vec2{
+    pub fn push_last_vec2(&self, cx:&mut Cx, animator:&Animator, ident:LiveId)->Vec2{
         let ret =  animator.last_vec2(cx, ident);
         self.push_vec2(cx, ret);
         ret
@@ -600,7 +607,7 @@ impl InstanceArea{
         draw_call.instance.push(value.y);
     }
 
-    pub fn push_last_vec3(&self, cx:&mut Cx, animator:&Animator, ident:Vec3Id)->Vec3{
+    pub fn push_last_vec3(&self, cx:&mut Cx, animator:&Animator, ident:LiveId)->Vec3{
         let ret = animator.last_vec3(cx, ident);
         self.push_vec3(cx, ret);
         ret
@@ -614,7 +621,7 @@ impl InstanceArea{
         draw_call.instance.push(value.z);
     }
 
-    pub fn push_last_vec4(&self, cx:&mut Cx, animator:&Animator, ident:Vec4Id)->Vec4{
+    pub fn push_last_vec4(&self, cx:&mut Cx, animator:&Animator, ident:LiveId)->Vec4{
         let ret = animator.last_vec4(cx, ident);
         self.push_vec4(cx, ret);
         ret
@@ -629,7 +636,7 @@ impl InstanceArea{
         draw_call.instance.push(value.w);
     }
 
-    pub fn push_last_color(&self, cx:&mut Cx, animator:&Animator, ident:ColorId)->Color{
+    pub fn push_last_color(&self, cx:&mut Cx, animator:&Animator, ident:LiveId)->Color{
         let ret = animator.last_color(cx, ident);
         self.push_color(cx, ret);
         ret
@@ -658,15 +665,10 @@ impl InstanceArea{
         return draw_call.need_uniforms_now()
     }
 
-    pub fn push_uniform_texture_2d(&self, cx:&mut Cx,texture:&Texture){
+    pub fn push_uniform_texture_2d(&self, cx:&mut Cx,texture:Texture){
         let cxview = &mut cx.views[self.view_id];
         let draw_call = &mut cxview.draw_calls[self.draw_call_id]; 
-         if let Some(texture_id) = texture.texture_id{
-            draw_call.textures_2d.push(texture_id as u32);
-        }
-        else{
-            draw_call.textures_2d.push(0);
-        }
+        draw_call.textures_2d.push(texture.texture_id as u32);
     }
 
     pub fn push_uniform_texture_2d_id(&self, cx:&mut Cx, texture_id: usize){
@@ -678,69 +680,69 @@ impl InstanceArea{
     pub fn push_uniform_float(&self, cx:&mut Cx, v:f32){
         let cxview = &mut cx.views[self.view_id];
         let draw_call = &mut cxview.draw_calls[self.draw_call_id]; 
-        draw_call.uniforms.push(v);
+        draw_call.user_uniforms.push(v);
     }
 
     pub fn push_uniform_vec2(&self, cx:&mut Cx, v:Vec2){
         let cxview = &mut cx.views[self.view_id];
         let draw_call = &mut cxview.draw_calls[self.draw_call_id]; 
-        let left = draw_call.uniforms.len()&3;
+        let left = draw_call.user_uniforms.len()&3;
         if left > 2{ // align buffer
             for _ in 0..(4-left){
-                draw_call.uniforms.push(0.0);
+                draw_call.user_uniforms.push(0.0);
             }
         }
-        draw_call.uniforms.push(v.x);
-        draw_call.uniforms.push(v.y);
+        draw_call.user_uniforms.push(v.x);
+        draw_call.user_uniforms.push(v.y);
     }
 
     pub fn push_uniform_vec2f(&self, cx:&mut Cx,  x:f32, y:f32){
         let cxview = &mut cx.views[self.view_id];
         let draw_call = &mut cxview.draw_calls[self.draw_call_id]; 
-        let left = draw_call.uniforms.len()&3;
+        let left = draw_call.user_uniforms.len()&3;
         if left > 2{ // align buffer
             for _ in 0..(4-left){
-                draw_call.uniforms.push(0.0);
+                draw_call.user_uniforms.push(0.0);
             }
         }
-        draw_call.uniforms.push(x);
-        draw_call.uniforms.push(y);
+        draw_call.user_uniforms.push(x);
+        draw_call.user_uniforms.push(y);
     }
 
     pub fn push_uniform_vec3f(&mut self, cx:&mut Cx, x:f32, y:f32, z:f32){
         let cxview = &mut cx.views[self.view_id];
         let draw_call = &mut cxview.draw_calls[self.draw_call_id]; 
-        let left = draw_call.uniforms.len()&3;
+        let left = draw_call.user_uniforms.len()&3;
         if left > 1{ // align buffer
             for _ in 0..(4-left){
-                draw_call.uniforms.push(0.0);
+                draw_call.user_uniforms.push(0.0);
             }
         }
-        draw_call.uniforms.push(x);
-        draw_call.uniforms.push(y);
-        draw_call.uniforms.push(z);
+        draw_call.user_uniforms.push(x);
+        draw_call.user_uniforms.push(y);
+        draw_call.user_uniforms.push(z);
     }
 
     pub fn push_uniform_vec4f(&self, cx:&mut Cx, x:f32, y:f32, z:f32, w:f32){
         let cxview = &mut cx.views[self.view_id];
         let draw_call = &mut cxview.draw_calls[self.draw_call_id]; 
-        let left = draw_call.uniforms.len()&3;
+        let left = draw_call.user_uniforms.len()&3;
         if left > 0{ // align buffer
             for _ in 0..(4-left){
-                draw_call.uniforms.push(0.0);
+                draw_call.user_uniforms.push(0.0);
             }
         }
-        draw_call.uniforms.push(x);
-        draw_call.uniforms.push(y);
-        draw_call.uniforms.push(z);
-        draw_call.uniforms.push(w);
+        draw_call.user_uniforms.push(x);
+        draw_call.user_uniforms.push(y);
+        draw_call.user_uniforms.push(z);
+        draw_call.user_uniforms.push(w);
     }
 
     pub fn push_uniform_mat4(&self, cx:&mut Cx, v:&Mat4){
         let cxview = &mut cx.views[self.view_id];
         let draw_call = &mut cxview.draw_calls[self.draw_call_id]; 
         for i in 0..16{
-            draw_call.uniforms.push(v.v[i]);
+            draw_call.user_uniforms.push(v.v[i]);
         }
     }
 }

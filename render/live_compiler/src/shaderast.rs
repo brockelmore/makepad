@@ -1,5 +1,6 @@
 use crate::env::VarKind;
-use crate::ident::Ident;
+use crate::ident::{Ident, IdentPath, QualifiedIdentPath, IdentPathWithSpan};
+use crate::livetypes::Shader;
 use crate::lit::{Lit, TyLit};
 use crate::span::Span;
 use crate::ty::Ty;
@@ -10,20 +11,32 @@ use std::fmt;
 
 #[derive(Clone, Debug)]
 pub struct ShaderAst {
+    pub qualified_ident_path: QualifiedIdentPath,
+    pub module_path: String,
     pub debug: bool,
+    pub shader: Option<Shader>,
+    pub default_geometry: Option<IdentPathWithSpan>,
+    pub decls: Vec<Decl>,
+    pub uses: Vec<IdentPathWithSpan>,
+    // generated
     pub const_table: RefCell<Option<Vec<f32>>>,
     pub const_table_spans: RefCell<Option<Vec<(usize,Span)>>>,
-    
-    pub decls: Vec<Decl>,
+    pub livestyle_uniform_deps: RefCell<Option<BTreeSet<(Ty,QualifiedIdentPath)>>>,
 }
 
 impl ShaderAst {
     pub fn new() -> ShaderAst {
         ShaderAst {
+            qualified_ident_path: QualifiedIdentPath::default(),
             debug: false,
+            shader: None,
+            module_path: String::new(),
+            uses: Vec::new(), 
             const_table: RefCell::new(None),
             const_table_spans: RefCell::new(None),
+            livestyle_uniform_deps: RefCell::new(None),
             decls: Vec::new(),
+            default_geometry: None
         }
     }
 
@@ -47,13 +60,13 @@ impl ShaderAst {
         })
     }
 
-    pub fn find_fn_decl(&self, ident: Ident) -> Option<&FnDecl> {
+    pub fn find_fn_decl(&self, ident_path: IdentPath) -> Option<&FnDecl> {
         self.decls.iter().rev().find_map(|decl| {
             match decl {
                 Decl::Fn(decl) => Some(decl),
                 _ => None,
             }
-            .filter(|decl| decl.ident == ident)
+            .filter(|decl| decl.ident_path == ident_path)
         })
     }
 
@@ -115,6 +128,7 @@ pub struct GeometryDecl {
     pub is_used_in_fragment_shader: Cell<Option<bool>>,
     pub span: Span,
     pub ident: Ident,
+    pub qualified_ident_path: QualifiedIdentPath,
     pub ty_expr: TyExpr,
 }
 
@@ -132,7 +146,7 @@ pub struct FnDecl {
     pub return_ty: RefCell<Option<Ty>>,
     pub is_used_in_vertex_shader: Cell<Option<bool>>,
     pub is_used_in_fragment_shader: Cell<Option<bool>>,
-    pub callees: RefCell<Option<BTreeSet<Ident>>>, 
+    pub callees: RefCell<Option<BTreeSet<IdentPath>>>, 
     pub uniform_block_deps: RefCell<Option<BTreeSet<Ident>>>,
     pub has_texture_deps: Cell<Option<bool>>,
     pub geometry_deps: RefCell<Option<BTreeSet<Ident>>>,
@@ -140,7 +154,7 @@ pub struct FnDecl {
     pub has_varying_deps: Cell<Option<bool>>,
     pub builtin_deps: RefCell<Option<BTreeSet<Ident>>>,
     pub cons_fn_deps: RefCell<Option<BTreeSet<(TyLit, Vec<Ty>)>>>,
-    pub ident: Ident,
+    pub ident_path: IdentPath,
     pub params: Vec<Param>,
     pub return_ty_expr: Option<TyExpr>,
     pub block: Block,
@@ -151,6 +165,7 @@ pub struct InstanceDecl {
     pub is_used_in_fragment_shader: Cell<Option<bool>>,
     pub span: Span,
     pub ident: Ident,
+    pub qualified_ident_path: QualifiedIdentPath,
     pub ty_expr: TyExpr,
 }
 
@@ -171,6 +186,7 @@ impl StructDecl {
 pub struct TextureDecl {
     pub span: Span,
     pub ident: Ident,
+    pub qualified_ident_path: QualifiedIdentPath,
     pub ty_expr: TyExpr,
 }
 
@@ -179,6 +195,7 @@ pub struct UniformDecl {
     pub span: Span,
     pub ident: Ident,
     pub ty_expr: TyExpr,
+    pub qualified_ident_path: QualifiedIdentPath,
     pub block_ident: Option<Ident>,
 }
 
@@ -319,7 +336,7 @@ pub enum ExprKind {
     },
     Call {
         span: Span,
-        ident: Ident,
+        ident_path: IdentPath,
         arg_exprs: Vec<Expr>,
     },
     MacroCall {
@@ -336,7 +353,7 @@ pub enum ExprKind {
     Var {
         span: Span,
         kind: Cell<Option<VarKind>>,
-        ident: Ident,
+        ident_path: IdentPath,
     },
     Lit {
         span: Span,
@@ -347,8 +364,6 @@ pub enum ExprKind {
 
 #[derive(Clone, Copy, Debug)]
 pub enum MacroCallAnalysis {
-    Pick { r: f32, g: f32, b: f32, a: f32 },
-    Slide { v: f32 }
 }
 
 #[derive(Clone, Copy, Debug)]

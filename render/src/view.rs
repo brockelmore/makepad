@@ -257,8 +257,8 @@ impl View {
 
 impl Cx {
     
-    pub fn new_instance_draw_call(&mut self, shader: &Shader, instance_count: usize) -> InstanceArea {
-        let (shader_id, shader_instance_id) = shader.shader_id.unwrap();
+    pub fn new_instance_draw_call(&mut self, shader: Shader, geometry:Option<Geometry>, instance_count: usize) -> InstanceArea {
+        let shader_id = shader.shader_id;
         let sh = &self.shaders[shader_id];
         
         let current_view_id = *self.view_stack.last().unwrap();
@@ -267,10 +267,22 @@ impl Cx {
         // we need a new draw call
         let draw_call_id = draw_list.draw_calls_len;
         draw_list.draw_calls_len = draw_list.draw_calls_len + 1;
-        
+        let geometry_id = if let Some(geometry) = geometry{
+            geometry.geometry_id
+        }
+        else{
+            if let Some(geometry) = &sh.default_geometry{
+                geometry.geometry_id
+            }
+            else{
+                println!("HERE {}", sh.name);
+                panic!("Shader has no default geometry {}", sh.name);
+            }
+        };
         // see if we need to add a new one
         if draw_call_id >= draw_list.draw_calls.len() {
             draw_list.draw_calls.push(DrawCall {
+                geometry_id: geometry_id,
                 draw_call_id: draw_call_id,
                 view_id: current_view_id,
                 redraw_id: self.redraw_id,
@@ -278,11 +290,11 @@ impl Cx {
                 do_v_scroll: true,
                 sub_view_id: 0,
                 shader_id: shader_id,
-                shader_instance_id: shader_instance_id,
-                uniforms_required: sh.mapping.uniform_props.total_slots,
+                shader_location_hash: shader.location_hash,
+                user_uniforms_required: sh.mapping.user_uniform_props.total_slots,
                 instance: Vec::new(),
                 draw_uniforms: DrawUniforms::default(),
-                uniforms: Vec::new(),
+                user_uniforms: Vec::new(),
                 textures_2d: Vec::new(),
                 current_instance_offset: 0,
                 instance_dirty: true,
@@ -296,14 +308,15 @@ impl Cx {
         // reuse a draw
         let dc = &mut draw_list.draw_calls[draw_call_id];
         dc.shader_id = shader_id;
-        dc.shader_instance_id = shader_instance_id;
-        dc.uniforms_required = sh.mapping.uniform_props.total_slots;
+        dc.geometry_id = geometry_id;
+        dc.shader_location_hash = shader.location_hash;
+        dc.user_uniforms_required = sh.mapping.user_uniform_props.total_slots;
         dc.sub_view_id = 0; // make sure its recognised as a draw call
         // truncate buffers and set update frame
         dc.redraw_id = self.redraw_id;
         dc.instance.truncate(0);
         dc.current_instance_offset = 0;
-        dc.uniforms.truncate(0);
+        dc.user_uniforms.truncate(0);
         dc.textures_2d.truncate(0);
         dc.instance_dirty = true;
         dc.uniforms_dirty = true;
@@ -312,8 +325,8 @@ impl Cx {
         return dc.get_current_instance_area(instance_count);
     }
     
-    pub fn new_instance(&mut self, shader: &Shader, instance_count: usize) -> InstanceArea {
-        let (shader_id, shader_instance_id) = shader.shader_id.expect("shader id invalid");
+    pub fn new_instance(&mut self, shader: Shader, geometry: Option<Geometry>, instance_count: usize) -> InstanceArea {
+        let shader_id = shader.shader_id;
         if !self.is_in_redraw_cycle {
             panic!("calling new_instance outside of redraw cycle is not possible!");
         }
@@ -324,7 +337,7 @@ impl Cx {
         if draw_list.draw_calls_len > 0 {
             for i in (0..draw_list.draw_calls_len).rev() {
                 let dc = &mut draw_list.draw_calls[i];
-                if dc.sub_view_id == 0 && dc.shader_id == shader_id && dc.shader_instance_id == shader_instance_id {
+                if dc.sub_view_id == 0 && dc.shader_id == shader_id && dc.shader_location_hash == shader.location_hash {
                     // reuse this drawcmd and add an instance
                     dc.current_instance_offset = dc.instance.len();
                     let slot_align = dc.instance.len() % sh.mapping.instance_props.total_slots;
@@ -336,7 +349,7 @@ impl Cx {
             }
         }
         
-        self.new_instance_draw_call(shader, instance_count)
+        self.new_instance_draw_call(shader, geometry, instance_count)
     }
     
     pub fn align_instance(&mut self, instance_area: InstanceArea) -> AlignedInstance {
@@ -414,14 +427,14 @@ pub struct DrawCall {
     pub redraw_id: u64,
     pub sub_view_id: usize, // if not 0, its a subnode
     pub shader_id: usize, // if shader_id changed, delete gl vao
-    pub shader_instance_id: usize,
+    pub shader_location_hash: u64,
     pub instance: Vec<f32>,
     pub current_instance_offset: usize, // offset of current instance
     
     pub draw_uniforms: DrawUniforms, // draw uniforms
-    
-    pub uniforms: Vec<f32>, // user uniforms
-    pub uniforms_required: usize,
+    pub geometry_id: usize,
+    pub user_uniforms: Vec<f32>, // user uniforms
+    pub user_uniforms_required: usize,
     
     pub do_v_scroll: bool,
     pub do_h_scroll: bool,
@@ -434,7 +447,7 @@ pub struct DrawCall {
 
 impl DrawCall {
     pub fn need_uniforms_now(&self) -> bool {
-        self.uniforms.len() < self.uniforms_required
+        self.user_uniforms.len() < self.user_uniforms_required
     }
     
     pub fn set_local_scroll(&mut self, scroll: Vec2, local_scroll: Vec2) {
@@ -589,20 +602,6 @@ impl CxView {
         let xs = if self.do_v_scroll {self.snapped_scroll.x}else {0.};
         let ys = if self.do_h_scroll {self.snapped_scroll.y}else {0.};
         Vec2 {x: xs, y: ys}
-    }
-    
-    fn view_transform() -> Mat4Id {uid!()}
-    fn draw_clip() -> Vec4Id {uid!()}
-    fn draw_scroll() -> Vec4Id {uid!()}
-    fn draw_zbias() -> FloatId {uid!()}
-    
-    pub fn def_uniforms(sg: ShaderGen) -> ShaderGen {
-        sg.compose(shader!{"
-            uniform view_transform: Self::view_transform() in view;
-            uniform draw_clip: Self::draw_clip() in draw;
-            uniform draw_scroll: Self::draw_scroll() in draw;
-            uniform draw_zbias: Self::draw_zbias() in draw;
-        "})
     }
     
     pub fn uniform_view_transform(&mut self, v: &Mat4) {

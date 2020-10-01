@@ -1,9 +1,7 @@
 use makepad_render::*;
-use makepad_microserde::*;
 use crate::normalbutton::*;
 use crate::tab::*;
 use crate::desktopwindow::*;
-use crate::windowmenu::*;
 use crate::tabclose::*;
 use crate::texteditor::*;
 use crate::textinput::*;
@@ -14,65 +12,51 @@ use crate::splitter::*;
 use crate::tabcontrol::*;
 use crate::xrcontrol::*;
 
-#[derive(Debug, Copy, Clone, SerRon, DeRon, PartialEq)]
-pub struct StyleOptions {
-    pub scale: f32,
-    pub dark: bool
-}
-
-impl Default for StyleOptions{
-    fn default()->Self{
-        Self{
-            scale:1.0,
-            dark:true,
+pub fn set_widget_style(cx: &mut Cx) {
+    
+    live!(cx, r#"
+        self::text_style_unscaled: TextStyle{
+            font: "resources/Ubuntu-R.ttf",
+            font_size: 8.0,
+            brightness: 1.0,
+            curve: 0.6,
+            line_spacing: 1.4,
+            top_drop: 1.2,
+            height_factor: 1.3,
         }
-    }
+        
+        self::text_style_normal: TextStyle{
+            font_size: 8.0,
+            ..self::text_style_unscaled
+        }
+        
+        self::text_style_fixed: TextStyle{
+            font: "resources/LiberationMono-Regular.ttf",
+            brightness: 1.1,
+            font_size: 8.0, 
+            line_spacing: 1.8,
+            top_drop: 1.3,
+            ..self::text_style_unscaled
+        }
+        
+        self::color_drop_quad: #a;
+        
+    "#);
+    TabClose::style(cx);
+    DesktopWindow::style(cx);
+    NormalButton::style(cx);
+    Tab::style(cx);
+    TextEditor::style(cx);
+    TextInput::style(cx);
+    ScrollBar::style(cx);
+    ScrollShadow::style(cx);
+    DesktopButton::style(cx);
+    Splitter::style(cx);
+    TabControl::style(cx);
+    XRControl::style(cx);
 }
 
-pub struct Theme {}
-impl Theme {
-    pub fn text_style_unscaled() -> TextStyleId {uid!()}
-    pub fn text_style_normal() -> TextStyleId {uid!()}
-    pub fn text_style_fixed() -> TextStyleId {uid!()}
-
-    pub fn color_bg_splitter() -> ColorId {uid!()}
-    pub fn color_bg_splitter_over() -> ColorId {uid!()}
-    pub fn color_bg_splitter_peak() -> ColorId {uid!()}
-    pub fn color_bg_splitter_drag() -> ColorId {uid!()}
-
-    pub fn color_scrollbar_base() -> ColorId {uid!()}
-    pub fn color_scrollbar_over() -> ColorId {uid!()}
-    pub fn color_scrollbar_down() -> ColorId {uid!()}
-
-    pub fn color_bg_normal() -> ColorId {uid!()}
-    pub fn color_bg_selected() -> ColorId {uid!()}
-    pub fn color_bg_odd() -> ColorId {uid!()}
-    pub fn color_bg_selected_over() -> ColorId {uid!()}
-    pub fn color_bg_odd_over() -> ColorId {uid!()}
-    pub fn color_bg_marked() -> ColorId {uid!()}
-    pub fn color_bg_marked_over() -> ColorId {uid!()}
-    pub fn color_over_border() -> ColorId {uid!()}
-    pub fn color_icon() -> ColorId {uid!()}
-    pub fn color_drop_quad() -> ColorId {uid!()}
-
-    pub fn color_text_focus() -> ColorId {uid!()}
-    pub fn color_text_defocus() -> ColorId {uid!()}
-    pub fn color_text_selected_focus() -> ColorId {uid!()}
-    pub fn color_text_deselected_focus() -> ColorId {uid!()}
-    pub fn color_text_selected_defocus() -> ColorId {uid!()}
-    pub fn color_text_deselected_defocus() -> ColorId {uid!()}
-}
-
-pub fn set_widget_style(cx: &mut Cx, opt: &StyleOptions) {
-
-    //if opt.dark {
-        Theme::color_bg_splitter().set(cx, pick!(5, 5, 5).get(cx));
-        Theme::color_bg_splitter_over().set(cx, pick!(#5).get(cx));
-        Theme::color_bg_splitter_peak().set(cx, pick!(#f).get(cx));
-        Theme::color_bg_splitter_drag().set(cx, pick!(#6).get(cx));
-        Theme::color_scrollbar_base().set(cx, pick!(#5).get(cx));
-        Theme::color_scrollbar_over().set(cx, pick!(#7).get(cx));
-        Theme::color_scrollbar_down().set(cx, pick!(#9).get(cx));
+  /*
         Theme::color_bg_normal().set(cx, pick!(52, 52, 52).get(cx));
         Theme::color_bg_selected().set(cx, pick!(40, 40, 40).get(cx));
         Theme::color_bg_odd().set(cx, pick!(37, 37, 37).get(cx));
@@ -140,45 +124,4 @@ pub fn set_widget_style(cx: &mut Cx, opt: &StyleOptions) {
         TextEditor::color_warning().set(cx, pick!(225, 229, 112).get(cx));
         TextEditor::color_error().set(cx, pick!(254, 0, 0).get(cx));
         TextEditor::color_defocus().set(cx, pick!(128, 128, 128).get(cx));
-    //}
-
-    let font = cx.load_font("resources/Ubuntu-R.ttf");
-    Theme::text_style_unscaled().set(cx, TextStyle {
-        font: font,
-        font_size: 8.0,
-        brightness: 1.0,
-        curve: 0.6,
-        line_spacing: 1.4,
-        top_drop: 1.2,
-        height_factor: 1.3,
-    });
-
-    Theme::text_style_normal().set(cx, TextStyle {
-        font_size: 8.0 * opt.scale,
-        ..Theme::text_style_unscaled().get(cx)
-    });
-
-    let font = cx.load_font("resources/LiberationMono-Regular.ttf");
-    Theme::text_style_fixed().set(cx, TextStyle {
-        font: font,
-        brightness: 1.1,
-        font_size: 8.0 * opt.scale,
-        line_spacing: 1.8,
-        top_drop: 1.3,
-        ..Theme::text_style_unscaled().get(cx)
-    });
-
-    TabClose::style(cx, opt);
-    DesktopWindow::style(cx, opt);
-    NormalButton::style(cx, opt);
-    Tab::style(cx, opt);
-    MenuItemDraw::style(cx, opt);
-    TextEditor::style(cx, opt);
-    TextInput::style(cx, opt);
-    ScrollBar::style(cx, opt);
-    ScrollShadow::style(cx, opt);
-    DesktopButton::style(cx, opt);
-    Splitter::style(cx, opt);
-    TabControl::style(cx, opt);
-    XRControl::style(cx, opt);
-}
+        */

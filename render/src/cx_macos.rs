@@ -1,6 +1,7 @@
 // MacOS specific loop
 use crate::cx_cocoa::*;
 use crate::cx::*;
+use crate::shader_std::*;
 
 impl Cx {
     
@@ -17,9 +18,11 @@ impl Cx {
         
         let mut metal_windows: Vec<MetalWindow> = Vec::new();
 
+        define_shader_stdlib(self);
+        
         self.mtl_compile_all_shaders(&metal_cx);
 
-        self.load_theme_fonts();
+        self.load_all_fonts();
         
         self.call_event_handler(&mut event_handler, &mut Event::Construct);
         
@@ -235,6 +238,7 @@ impl Cx {
             }
             
             // show the timer
+            /*
             if self.shader_recompiles.len()>0{
                 
                 let mut shader_results = Vec::new();
@@ -244,7 +248,7 @@ impl Cx {
                 
                 self.shader_recompiles.truncate(0);
                 self.call_shader_recompile_event(shader_results, &mut event_handler);
-            }
+            }*/
                 
             
             if self.playing_anim_areas.len() == 0 && self.redraw_parent_areas.len() == 0 && self.redraw_child_areas.len() == 0 && self.frame_callbacks.len() == 0 {

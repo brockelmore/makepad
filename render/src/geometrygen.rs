@@ -1,5 +1,5 @@
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Geometry {
+pub struct GeometryGen {
     pub vertices: Vec<f32>, // vec4 pos, vec3 normal, vec2 uv
     pub indices: Vec<u32>
 }
@@ -11,18 +11,38 @@ pub enum GeometryAxis {
     Z = 2,
 }
 
-impl Geometry {
+impl GeometryGen {
+    
+    pub fn from_quad_2d(x1:f32, y1:f32, x2:f32, y2:f32)->GeometryGen{
+        let mut g = Self::default();
+        g.add_quad_2d(x1,y1,x2,y2);
+        g
+    }
+    
+    pub fn from_cube_3d(
+        width: f32,
+        height: f32,
+        depth: f32,
+        width_segments: usize,
+        height_segments: usize,
+        depth_segments: usize
+    )->GeometryGen{
+        let mut g = Self::default();
+        g.add_cube_3d(width, height, depth, width_segments, height_segments, depth_segments);
+        g
+    }
+    
     // requires pos:vec2 normalized layout
-    pub fn add_quad_2d(&mut self) {
+    pub fn add_quad_2d(&mut self, x1:f32, y1:f32, x2:f32, y2:f32) {
         let vertex_offset = self.vertices.len() as u32;
-        self.vertices.push(0.0);
-        self.vertices.push(0.0);
-        self.vertices.push(1.0);
-        self.vertices.push(0.0);
-        self.vertices.push(1.0);
-        self.vertices.push(1.0);
-        self.vertices.push(0.0);
-        self.vertices.push(1.0);
+        self.vertices.push(x1);
+        self.vertices.push(y1);
+        self.vertices.push(x2);
+        self.vertices.push(y1);
+        self.vertices.push(x2);
+        self.vertices.push(y2);
+        self.vertices.push(x1);
+        self.vertices.push(y2);
         self.indices.push(vertex_offset + 0);
         self.indices.push(vertex_offset + 1);
         self.indices.push(vertex_offset + 2);
